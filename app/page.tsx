@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   const stats = {
     estimates: estimates.length,
     orders: orders.length,
-    revenue: estimates.reduce((sum, e) => sum + (e.totals?.total || 0), 0),
+    revenue: orders.reduce((sum, o) => sum + (o.amount || 0), 0),
     conversion:
       estimates.length > 0
         ? Math.round(((estimates.filter((e) => e.status === "accepted").length || 0) / estimates.length) * 100)

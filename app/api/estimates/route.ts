@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { insertEstimate, listEstimates } from "@/lib/db"
+import { insertEstimate, listEstimates, syncPipelineFromEstimate } from "@/lib/db"
 import { z } from "zod"
 
 export const runtime = "nodejs"
@@ -44,7 +44,12 @@ export async function POST(request: Request) {
   try {
     const json = await request.json()
     const parsed = EstimateSchema.parse(json)
-    const id = await insertEstimate(parsed)
+    const normalized = {
+      ...parsed,
+      identity: { ...parsed.identity, logo: parsed.identity.logo || undefined },
+    }
+    const id = await insertEstimate(normalized)
+    await syncPipelineFromEstimate({ ...normalized, id })
     return NextResponse.json({ id }, { status: 201 })
   } catch (error) {
     console.error("Failed to create estimate", error)

@@ -83,6 +83,16 @@ type PipelineStage = {
   cards: PipelineCard[]
 }
 
+const defaultPipelineStages: PipelineStage[] = [
+  { id: "new", name: "New Estimate Sent", color: "bg-info", cards: [] },
+  { id: "negotiating", name: "Customer Negotiating", color: "bg-warning", cards: [] },
+  { id: "accepted", name: "Customer Accepted", color: "bg-success", cards: [] },
+  { id: "rejected", name: "Customer Rejected", color: "bg-destructive", cards: [] },
+  { id: "confirmed", name: "Order Confirmed", color: "bg-chart-4", cards: [] },
+  { id: "processing", name: "Order Processing", color: "bg-primary", cards: [] },
+  { id: "completed", name: "Completed", color: "bg-muted-foreground", cards: [] },
+]
+
 type DbRow<T> = { id: number; data: T; created_at: string }
 
 let tablesReady = false
@@ -182,13 +192,14 @@ export async function insertEstimate(payload: EstimatePayload & { id?: number })
 
 export async function listEstimates() {
   await ensureTables()
-  const result = await sql`SELECT id, data, created_at FROM estimates ORDER BY created_at DESC`
+  const result = await sql<DbRow<EstimatePayload>>`SELECT id, data, created_at FROM estimates ORDER BY created_at DESC`
   return result.rows.map(rowToEstimate)
 }
 
 export async function getEstimate(id: number) {
   await ensureTables()
-  const result = await sql`SELECT id, data, created_at FROM estimates WHERE id = ${id} LIMIT 1`
+  const result =
+    await sql<DbRow<EstimatePayload>>`SELECT id, data, created_at FROM estimates WHERE id = ${id} LIMIT 1`
   const row = result.rows[0]
   return row ? rowToEstimate(row as any) : null
 }
@@ -226,13 +237,13 @@ export async function insertVendor(payload: VendorPayload & { id?: number }) {
 
 export async function listVendors() {
   await ensureTables()
-  const result = await sql`SELECT id, data, created_at FROM vendors ORDER BY created_at DESC`
+  const result = await sql<DbRow<VendorPayload>>`SELECT id, data, created_at FROM vendors ORDER BY created_at DESC`
   return result.rows.map(rowToVendor)
 }
 
 export async function getVendor(id: number) {
   await ensureTables()
-  const result = await sql`SELECT id, data, created_at FROM vendors WHERE id = ${id} LIMIT 1`
+  const result = await sql<DbRow<VendorPayload>>`SELECT id, data, created_at FROM vendors WHERE id = ${id} LIMIT 1`
   const row = result.rows[0]
   return row ? rowToVendor(row as any) : null
 }
@@ -265,13 +276,14 @@ export async function insertCustomer(payload: CustomerPayload & { id?: number })
 
 export async function listCustomers() {
   await ensureTables()
-  const result = await sql`SELECT id, data, created_at FROM customers ORDER BY created_at DESC`
+  const result = await sql<DbRow<CustomerPayload>>`SELECT id, data, created_at FROM customers ORDER BY created_at DESC`
   return result.rows.map(rowToCustomer)
 }
 
 export async function getCustomer(id: number) {
   await ensureTables()
-  const result = await sql`SELECT id, data, created_at FROM customers WHERE id = ${id} LIMIT 1`
+  const result =
+    await sql<DbRow<CustomerPayload>>`SELECT id, data, created_at FROM customers WHERE id = ${id} LIMIT 1`
   const row = result.rows[0]
   return row ? rowToCustomer(row as any) : null
 }
@@ -304,13 +316,23 @@ export async function insertOrder(payload: OrderPayload & { id?: number }) {
 
 export async function listOrders() {
   await ensureTables()
-  const result = await sql`SELECT id, data, created_at FROM orders ORDER BY created_at DESC`
+  const result = await sql<DbRow<OrderPayload>>`SELECT id, data, created_at FROM orders ORDER BY created_at DESC`
   return result.rows.map(rowToOrder)
 }
 
 export async function getOrder(id: number) {
   await ensureTables()
-  const result = await sql`SELECT id, data, created_at FROM orders WHERE id = ${id} LIMIT 1`
+  const result = await sql<DbRow<OrderPayload>>`SELECT id, data, created_at FROM orders WHERE id = ${id} LIMIT 1`
+  const row = result.rows[0]
+  return row ? rowToOrder(row as any) : null
+}
+
+export async function findOrderByEstimateId(estimateId: number | string) {
+  await ensureTables()
+  const result =
+    await sql<DbRow<OrderPayload>>`SELECT id, data, created_at FROM orders WHERE data->>'estimateId' = ${String(
+      estimateId,
+    )} LIMIT 1`
   const row = result.rows[0]
   return row ? rowToOrder(row as any) : null
 }
@@ -339,4 +361,74 @@ export async function updateEstimateStatus(id: number, status: string, history: 
         status = ${status}
     WHERE id = ${id}
   `
+}
+
+function ensureStageCollection(stages: PipelineStage[]) {
+  if (!stages || stages.length === 0) return [...defaultPipelineStages]
+  // Make sure every default stage exists to avoid undefined targets
+  const next = [...stages]
+  for (const def of defaultPipelineStages) {
+    if (!next.find((s) => s.id === def.id)) {
+      next.push({ ...def, cards: [] })
+    }
+  }
+  return next
+}
+
+async function upsertPipelineCard(card: PipelineCard, targetStageId: string) {
+  const current = ensureStageCollection(await listPipeline())
+  // remove card from all stages
+  for (const stage of current) {
+    stage.cards = stage.cards.filter((c) => c.id !== card.id)
+  }
+  const target = current.find((s) => s.id === targetStageId)
+  if (target) {
+    target.cards.push(card)
+  }
+  await savePipeline(current)
+}
+
+const estimateToStage: Record<string, string> = {
+  submitted: "new",
+  draft: "new",
+  sent: "new",
+  viewed: "new",
+  negotiating: "negotiating",
+  accepted: "accepted",
+  rejected: "rejected",
+}
+
+const orderToStage: Record<string, string> = {
+  confirmed: "confirmed",
+  processing: "processing",
+  completed: "completed",
+  delivered: "completed",
+}
+
+export async function syncPipelineFromEstimate(estimate: EstimatePayload & { id: number }) {
+  const stage = estimateToStage[estimate.status] || "new"
+  const card: PipelineCard = {
+    id: `estimate-${estimate.id}`,
+    customer: estimate.customer?.name,
+    email: estimate.customer?.email,
+    estimateId: String(estimate.id),
+    amount: estimate.totals?.total ?? 0,
+    date: estimate.createdAt,
+    notes: estimate.notes,
+    revisions: estimate.history?.length ?? 0,
+  }
+  await upsertPipelineCard(card, stage)
+}
+
+export async function syncPipelineFromOrder(order: OrderPayload & { id: number }) {
+  const stage = orderToStage[order.status || ""] || "confirmed"
+  const card: PipelineCard = {
+    id: order.estimateId ? `estimate-${order.estimateId}` : `order-${order.id}`,
+    customer: order.customer,
+    estimateId: order.estimateId ? String(order.estimateId) : undefined,
+    amount: order.amount,
+    date: order.createdAt,
+    notes: order.notes,
+  }
+  await upsertPipelineCard(card, stage)
 }
