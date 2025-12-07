@@ -733,10 +733,6 @@ export function EstimateForm() {
             <CardTitle className="text-base">Export as PDF</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full bg-transparent" onClick={handleCreatePdfPreview}>
-              <FileText className="mr-2 h-4 w-4" />
-              Create PDF Preview
-            </Button>
             <Button className="w-full" onClick={handleDownloadPdf}>
               <Download className="mr-2 h-4 w-4" />
               Download PDF
