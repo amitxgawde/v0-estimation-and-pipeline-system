@@ -1,83 +1,36 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, ExternalLink, Copy, Edit, Send, FileText } from "lucide-react"
+import { MoreHorizontal, Edit, Trash2, FileText } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import React from "react"
+import { cn } from "@/lib/utils"
 
-const estimates = [
-  {
-    id: "EST-001",
-    customer: "Acme Corp",
-    email: "purchasing@acme.com",
-    items: 3,
-    amount: "$12,500",
-    margin: "25%",
-    status: "sent",
-    date: "Dec 5, 2025",
-    revisions: 1,
-  },
-  {
-    id: "EST-002",
-    customer: "TechStart Inc",
-    email: "jane@techstart.io",
-    items: 5,
-    amount: "$8,750",
-    margin: "30%",
-    status: "viewed",
-    date: "Dec 5, 2025",
-    revisions: 0,
-  },
-  {
-    id: "EST-003",
-    customer: "Global Solutions",
-    email: "orders@globalsolutions.com",
-    items: 8,
-    amount: "$24,000",
-    margin: "22%",
-    status: "accepted",
-    date: "Dec 4, 2025",
-    revisions: 2,
-  },
-  {
-    id: "EST-004",
-    customer: "Retail Plus",
-    email: "mike@retailplus.co",
-    items: 2,
-    amount: "$5,200",
-    margin: "35%",
-    status: "negotiating",
-    date: "Dec 3, 2025",
-    revisions: 3,
-  },
-  {
-    id: "EST-005",
-    customer: "BuildRight LLC",
-    email: "procurement@buildright.com",
-    items: 12,
-    amount: "$45,800",
-    margin: "18%",
-    status: "draft",
-    date: "Dec 3, 2025",
-    revisions: 0,
-  },
-  {
-    id: "EST-006",
-    customer: "QuickServe",
-    email: "orders@quickserve.net",
-    items: 1,
-    amount: "$2,100",
-    margin: "40%",
-    status: "rejected",
-    date: "Dec 2, 2025",
-    revisions: 1,
-  },
-]
+type EstimateRow = {
+  id: number
+  status: string
+  customer?: { name?: string; email?: string }
+  items?: Array<{
+    id?: number
+    description?: string
+    quantity: number
+    sellingPrice: number
+    costPrice: number
+  }>
+  totals?: { total?: number; totalCost?: number }
+  total?: number
+  totalCost?: number
+  createdAt?: string
+}
 
 const statusStyles: Record<string, string> = {
   draft: "bg-secondary text-secondary-foreground",
+  submitted: "bg-info/10 text-info border-info/20",
   sent: "bg-info/10 text-info border-info/20",
   viewed: "bg-warning/10 text-warning border-warning/20",
   accepted: "bg-success/10 text-success border-success/20",
@@ -85,7 +38,81 @@ const statusStyles: Record<string, string> = {
   rejected: "bg-destructive/10 text-destructive border-destructive/20",
 }
 
+const formatCurrency = (value?: number) => {
+  if (typeof value !== "number") return "—"
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value)
+}
+
 export function EstimatesList() {
+  const [estimates, setEstimates] = useState<EstimateRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/estimates", { cache: "no-store" })
+        if (!res.ok) throw new Error("Failed to load estimates")
+        const data = await res.json()
+        setEstimates(data.estimates || [])
+      } catch (err) {
+        console.error("Failed to load estimates", err)
+        setError("Could not load estimates. Please try again.")
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const handleDelete = async (id: number) => {
+    const previous = estimates
+    // optimistic remove
+    setEstimates((prev) => prev.filter((e) => e.id !== id))
+    try {
+      const res = await fetch(`/api/estimates/${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Delete failed")
+      const refreshed = await fetch("/api/estimates", { cache: "no-store" })
+      if (!refreshed.ok) throw new Error("Refresh failed")
+      const data = await refreshed.json()
+      setEstimates(data.estimates || [])
+    } catch (err) {
+      console.error("Failed to delete estimate", err)
+      alert("Delete failed")
+      setEstimates(previous) // rollback
+    }
+  }
+
+  const handleRevise = (id: number) => {
+    router.push(`/estimates/${id}`)
+  }
+
+  const rows = useMemo(() => {
+    return estimates.map((estimate) => {
+      const customerName = (estimate as any).customer?.name ?? estimate.customer?.name ?? estimate.customerName
+      const customerEmail = (estimate as any).customer?.email ?? estimate.customer?.email ?? estimate.customerEmail
+      const total = (estimate as any).totals?.total ?? estimate.total
+      const totalCost = (estimate as any).totals?.totalCost ?? estimate.totalCost
+      const itemsCount = estimate.items?.length ?? (estimate as any).items?.length ?? 0
+      const marginPct =
+        typeof totalCost === "number" && totalCost > 0 && typeof total === "number"
+          ? ((total - totalCost) / totalCost) * 100
+          : null
+      return {
+        ...estimate,
+        customerName,
+        customerEmail,
+        total,
+        totalCost,
+        displayId: `EST-${estimate.id.toString().padStart(4, "0")}`,
+        itemsCount,
+        marginPct,
+        date: estimate.createdAt ? new Date(estimate.createdAt).toLocaleDateString() : "—",
+      }
+    })
+  }, [estimates])
+
   return (
     <Card>
       <CardContent className="p-0">
@@ -120,68 +147,104 @@ export function EstimatesList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {estimates.map((estimate) => (
-                <tr key={estimate.id} className="hover:bg-muted/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <Link
-                          href={`/estimates/${estimate.id}`}
-                          className="text-sm font-medium text-foreground hover:text-primary"
-                        >
-                          {estimate.id}
-                        </Link>
-                        {estimate.revisions > 0 && (
-                          <p className="text-xs text-muted-foreground">v{estimate.revisions + 1}</p>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{estimate.customer}</p>
-                      <p className="text-xs text-muted-foreground">{estimate.email}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-foreground">{estimate.items}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-foreground">{estimate.amount}</td>
-                  <td className="px-6 py-4 text-sm text-foreground">{estimate.margin}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className={statusStyles[estimate.status]}>
-                      {estimate.status}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{estimate.date}</td>
-                  <td className="px-6 py-4 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          View Link
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Copy className="mr-2 h-4 w-4" />
-                          Copy Link
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Revise
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Send className="mr-2 h-4 w-4" />
-                          Resend
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {loading && (
+                <tr>
+                  <td className="px-6 py-4 text-sm text-muted-foreground" colSpan={8}>
+                    Loading estimates...
                   </td>
                 </tr>
-              ))}
+              )}
+              {!loading && error && (
+                <tr>
+                  <td className="px-6 py-4 text-sm text-destructive" colSpan={8}>
+                    {error}
+                  </td>
+                </tr>
+              )}
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td className="px-6 py-4 text-sm text-muted-foreground" colSpan={8}>
+                    No estimates yet. Create your first estimate.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                rows.map((estimate) => (
+                  <tr
+                    key={estimate.id}
+                    className={cn("hover:bg-muted/50 transition-colors cursor-pointer")}
+                    onClick={() => router.push(`/estimates/${estimate.id}`)}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <Link
+                            href={`/estimates/${estimate.id}`}
+                            className="text-sm font-medium text-foreground hover:text-primary"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {estimate.displayId}
+                          </Link>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{estimate.customerName || "—"}</p>
+                        <p className="text-xs text-muted-foreground">{estimate.customerEmail || ""}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-foreground">{estimate.itemsCount}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-foreground">{formatCurrency(estimate.total)}</td>
+                    <td className="px-6 py-4 text-sm text-foreground">
+                      {estimate.marginPct !== null ? `${estimate.marginPct.toFixed(0)}%` : "—"}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge
+                        variant="outline"
+                        className={statusStyles[estimate.status] || "bg-secondary text-secondary-foreground"}
+                      >
+                        {estimate.status}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{estimate.date}</td>
+                    <td className="px-6 py-4 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/estimates/${estimate.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                // let Link handle navigation
+                              }}
+                              className="flex items-center"
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Revise
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleDelete(estimate.id)
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

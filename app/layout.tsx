@@ -7,10 +7,16 @@ import "./globals.css"
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
+const giftFavicon =
+  "/gift-icon.svg"
+
 export const metadata: Metadata = {
-  title: "EstiFlow - Estimation & Pipeline Management",
+  title: "AGSoft - Estimation & Pipeline Management",
   description: "Streamline your estimates, pipeline, and finances in one place",
   generator: "v0.app",
+  icons: {
+    icon: [{ url: giftFavicon }],
+  },
 }
 
 export default function RootLayout({

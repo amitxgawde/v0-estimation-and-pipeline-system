@@ -22,7 +22,7 @@ export default function PipelinePage() {
                 Customize
               </Button>
             </div>
-            <div className="text-sm text-muted-foreground">32 deals worth $245,800</div>
+            <div className="text-sm text-muted-foreground">Live pipeline</div>
           </div>
           <PipelineBoard />
         </div>

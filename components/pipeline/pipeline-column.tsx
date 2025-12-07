@@ -34,7 +34,7 @@ export function PipelineColumn({ stage, onCardClick, onMoveCard, allStages }: Pi
       </div>
 
       {/* Column Value */}
-      <div className="mb-3 text-xs text-muted-foreground">${totalValue.toLocaleString()}</div>
+      <div className="mb-3 text-xs text-muted-foreground">{totalValue.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</div>
 
       {/* Cards */}
       <div className="flex flex-1 flex-col gap-2">

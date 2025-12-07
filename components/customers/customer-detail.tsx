@@ -99,7 +99,9 @@ export function CustomerDetail({ id }: CustomerDetailProps) {
               <Button variant="outline" className="bg-transparent">
                 Edit Customer
               </Button>
-              <Button>New Estimate</Button>
+              <Button asChild>
+                <Link href="/estimates/new">New Estimate</Link>
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -128,7 +130,7 @@ export function CustomerDetail({ id }: CustomerDetailProps) {
                 <DollarSign className="h-5 w-5 text-secondary-foreground" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">${customer.totalValue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-foreground">{customer.totalValue.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
                 <p className="text-sm text-muted-foreground">Total Value</p>
               </div>
             </div>
@@ -142,7 +144,7 @@ export function CustomerDetail({ id }: CustomerDetailProps) {
                 <DollarSign className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-success">${customer.collected.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-success">{customer.collected.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
                 <p className="text-sm text-muted-foreground">Collected</p>
               </div>
             </div>
@@ -156,7 +158,7 @@ export function CustomerDetail({ id }: CustomerDetailProps) {
                 <TrendingUp className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-primary">${customer.profit.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-primary">{customer.profit.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
                 <p className="text-sm text-muted-foreground">Your Profit</p>
               </div>
             </div>
@@ -181,15 +183,15 @@ export function CustomerDetail({ id }: CustomerDetailProps) {
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-lg bg-secondary p-4">
                 <p className="text-xs text-muted-foreground mb-1">Total Outstanding</p>
-                <p className="text-xl font-bold text-foreground">${customer.pending.toLocaleString()}</p>
+                <p className="text-xl font-bold text-foreground">{customer.pending.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
               </div>
               <div className="rounded-lg bg-success/10 p-4">
                 <p className="text-xs text-success mb-1">Collected</p>
-                <p className="text-xl font-bold text-success">${customer.collected.toLocaleString()}</p>
+                <p className="text-xl font-bold text-success">{customer.collected.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
               </div>
               <div className="rounded-lg bg-primary/10 p-4">
                 <p className="text-xs text-primary mb-1">Total Profit</p>
-                <p className="text-xl font-bold text-primary">${customer.profit.toLocaleString()}</p>
+                <p className="text-xl font-bold text-primary">{customer.profit.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
               </div>
             </div>
           </div>
@@ -216,13 +218,13 @@ export function CustomerDetail({ id }: CustomerDetailProps) {
                       {order.status}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      ${order.paid.toLocaleString()} / ${order.amount.toLocaleString()}
+                      {order.paid.toLocaleString("en-IN", { style: "currency", currency: "INR" })} / {order.amount.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-foreground">${order.amount.toLocaleString()}</p>
-                  <p className="text-xs text-success mt-1">+${order.profit.toLocaleString()}</p>
+                  <p className="text-sm font-bold text-foreground">{order.amount.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
+                  <p className="text-xs text-success mt-1">+{order.profit.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
                 </div>
               </div>
             ))}
@@ -251,7 +253,7 @@ export function CustomerDetail({ id }: CustomerDetailProps) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-foreground">${estimate.amount.toLocaleString()}</p>
+                  <p className="text-sm font-bold text-foreground">{estimate.amount.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</p>
                   <Badge variant="outline" className={`${statusStyles[estimate.status]} mt-1`}>
                     {estimate.status}
                   </Badge>

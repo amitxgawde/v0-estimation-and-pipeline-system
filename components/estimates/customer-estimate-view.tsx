@@ -110,9 +110,9 @@ export function CustomerEstimateView({ id }: CustomerEstimateViewProps) {
                     <tr key={index}>
                       <td className="py-3 text-sm text-foreground">{item.description}</td>
                       <td className="py-3 text-center text-sm text-foreground">{item.quantity}</td>
-                      <td className="py-3 text-right text-sm text-foreground">${item.price.toFixed(2)}</td>
+                      <td className="py-3 text-right text-sm text-foreground">{item.price.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</td>
                       <td className="py-3 text-right text-sm font-medium text-foreground">
-                        ${(item.price * item.quantity).toFixed(2)}
+                        {(item.price * item.quantity).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
                       </td>
                     </tr>
                   ))}
@@ -123,20 +123,20 @@ export function CustomerEstimateView({ id }: CustomerEstimateViewProps) {
                       Subtotal
                     </td>
                     <td className="py-3 text-right text-sm font-medium text-foreground">
-                      ${estimate.subtotal.toFixed(2)}
+                      {estimate.subtotal.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
                     </td>
                   </tr>
                   <tr>
                     <td colSpan={3} className="py-1 text-right text-sm text-muted-foreground">
                       Tax (18%)
                     </td>
-                    <td className="py-1 text-right text-sm text-foreground">${estimate.tax.toFixed(2)}</td>
+                    <td className="py-1 text-right text-sm text-foreground">{estimate.tax.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</td>
                   </tr>
                   <tr className="border-t border-border">
                     <td colSpan={3} className="py-3 text-right font-medium text-foreground">
                       Total
                     </td>
-                    <td className="py-3 text-right text-xl font-bold text-foreground">${estimate.total.toFixed(2)}</td>
+                    <td className="py-3 text-right text-xl font-bold text-foreground">{estimate.total.toLocaleString("en-IN", { style: "currency", currency: "INR" })}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -195,7 +195,9 @@ export function CustomerEstimateView({ id }: CustomerEstimateViewProps) {
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-xs text-muted-foreground">Powered by EstiFlow</p>
+        <p className="text-center text-xs text-muted-foreground font-semibold font-sans tracking-tight">
+          Powered by AGSoft
+        </p>
       </div>
     </div>
   )

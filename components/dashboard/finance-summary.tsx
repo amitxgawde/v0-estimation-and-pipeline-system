@@ -1,22 +1,58 @@
+ "use client"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
-const financeData = {
-  outstanding: "$45,200",
-  dueToday: "$8,500",
-  overdue: "$12,300",
-  collected: "$156,800",
+type Estimate = {
+  totals: { total?: number; tax?: number; subtotal?: number }
 }
 
-const overdueCustomers = [
-  { name: "TechStart Inc", amount: "$4,500", days: 15 },
-  { name: "Retail Plus", amount: "$3,200", days: 8 },
-  { name: "Global Solutions", amount: "$4,600", days: 5 },
-]
+type Order = {
+  amount?: number
+  paymentReceived?: number
+}
 
 export function FinanceSummary() {
+  const [estimates, setEstimates] = useState<Estimate[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const est = await fetch("/api/estimates", { cache: "no-store" }).then((r) => r.json())
+        const ord = await fetch("/api/orders", { cache: "no-store" }).then((r) => r.json())
+        setEstimates(est.estimates || [])
+        setOrders(ord.orders || [])
+      } catch (err) {
+        console.error("Finance load failed", err)
+      }
+    }
+    load()
+  }, [])
+
+  const metrics = useMemo(() => {
+    const totalEstimateValue = estimates.reduce((sum, e) => sum + (e.totals?.total || 0), 0)
+    const collected = orders.reduce((sum, o) => sum + (o.paymentReceived || 0), 0)
+    const outstanding = orders.reduce(
+      (sum, o) => sum + Math.max((o.amount || 0) - (o.paymentReceived || 0), 0),
+      0,
+    )
+    return {
+      outstanding,
+      dueToday: 0,
+      overdue: 0,
+      collected,
+      totalEstimateValue,
+    }
+  }, [estimates, orders])
+
+  const trend = useMemo(() => {
+    const val = Math.max(metrics.collected, 1)
+    return [val * 0.3, val * 0.5, val * 0.4, val * 0.65, val * 0.7, val * 0.8, val]
+  }, [metrics.collected])
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -28,46 +64,57 @@ export function FinanceSummary() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Summary Grid */}
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-lg bg-secondary p-3">
             <p className="text-xs text-muted-foreground">Outstanding</p>
-            <p className="text-lg font-semibold text-foreground">{financeData.outstanding}</p>
+            <p className="text-lg font-semibold text-foreground">
+              {metrics.outstanding.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+            </p>
           </div>
           <div className="rounded-lg bg-secondary p-3">
             <p className="text-xs text-muted-foreground">Due Today</p>
-            <p className="text-lg font-semibold text-foreground">{financeData.dueToday}</p>
+            <p className="text-lg font-semibold text-foreground">
+              {metrics.dueToday.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+            </p>
           </div>
           <div className="rounded-lg bg-destructive/10 p-3">
             <p className="text-xs text-destructive">Overdue</p>
-            <p className="text-lg font-semibold text-destructive">{financeData.overdue}</p>
+            <p className="text-lg font-semibold text-destructive">
+              {metrics.overdue.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+            </p>
           </div>
           <div className="rounded-lg bg-success/10 p-3">
-            <p className="text-xs text-success">Collected (MTD)</p>
-            <p className="text-lg font-semibold text-success">{financeData.collected}</p>
+            <p className="text-xs text-success">Collected</p>
+            <p className="text-lg font-semibold text-success">
+              {metrics.collected.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+            </p>
           </div>
         </div>
 
-        {/* Overdue List */}
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs text-muted-foreground mb-2">Collections trend</p>
+          <svg viewBox="0 0 100 30" className="h-16 w-full text-primary/70">
+            <polyline
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              points={trend
+                .map((v, i) => {
+                  const x = (i / Math.max(trend.length - 1, 1)) * 100
+                  const y = 30 - (v / Math.max(...trend, 1)) * 26 - 2
+                  return `${x},${y}`
+                })
+                .join(" ")}
+            />
+          </svg>
+        </div>
+
         <div>
           <div className="mb-2 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-destructive" />
             <p className="text-sm font-medium text-foreground">Overdue Payments</p>
           </div>
-          <div className="space-y-2">
-            {overdueCustomers.map((customer) => (
-              <div
-                key={customer.name}
-                className="flex items-center justify-between rounded-lg border border-border p-3"
-              >
-                <div>
-                  <p className="text-sm font-medium text-foreground">{customer.name}</p>
-                  <p className="text-xs text-muted-foreground">{customer.days} days overdue</p>
-                </div>
-                <p className="text-sm font-semibold text-destructive">{customer.amount}</p>
-              </div>
-            ))}
-          </div>
+          <p className="text-sm text-muted-foreground">No overdue records yet.</p>
         </div>
       </CardContent>
     </Card>

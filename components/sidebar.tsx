@@ -3,7 +3,17 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, FileText, Kanban, ShoppingCart, DollarSign, Users, Settings, Plus } from "lucide-react"
+import {
+  LayoutDashboard,
+  FileText,
+  Kanban,
+  ShoppingCart,
+  DollarSign,
+  Users,
+  Settings,
+  Plus,
+  Building2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navigation = [
@@ -13,6 +23,7 @@ const navigation = [
   { name: "Orders", href: "/orders", icon: ShoppingCart },
   { name: "Finance", href: "/finance", icon: DollarSign },
   { name: "Customers", href: "/customers", icon: Users },
+  { name: "Vendors", href: "/vendors", icon: Building2 },
 ]
 
 export function Sidebar() {
@@ -24,23 +35,30 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex h-16 items-center gap-2 border-b border-border px-6">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <FileText className="h-4 w-4 text-primary-foreground" />
+            <span aria-label="Gift" role="img" className="text-base">
+              🎁
+            </span>
           </div>
-          <span className="text-lg font-semibold text-foreground">EstiFlow</span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-lg font-bold tracking-tight font-sans text-foreground">AGSoft</span>
+            <span className="text-[11px] font-medium text-muted-foreground">the gift store manager</span>
+          </div>
         </div>
 
         {/* Quick Action */}
         <div className="p-4">
-          <Button className="w-full justify-start gap-2" size="sm">
-            <Plus className="h-4 w-4" />
-            New Estimate
+          <Button asChild className="w-full justify-start gap-2" size="sm">
+            <Link href="/estimates/new">
+              <Plus className="h-4 w-4" />
+              New Estimate
+            </Link>
           </Button>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3">
           {navigation.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`))
             return (
               <Link
                 key={item.name}
