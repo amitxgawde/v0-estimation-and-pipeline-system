@@ -21,7 +21,7 @@ const OrderSchema = z.object({
 
 export async function GET() {
   try {
-    const orders = listOrders()
+    const orders = await listOrders()
     return NextResponse.json({ orders })
   } catch (error) {
     console.error("Failed to fetch orders", error)
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   try {
     const json = await request.json()
     const parsed = OrderSchema.parse(json)
-    const id = insertOrder(parsed)
+    const id = await insertOrder(parsed)
     return NextResponse.json({ id }, { status: 201 })
   } catch (error) {
     console.error("Failed to create order", error)

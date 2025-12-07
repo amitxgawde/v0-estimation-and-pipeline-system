@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { listEstimates, insertEstimate, deleteEstimate } from "@/lib/db"
+import { listEstimates, getEstimate, updateEstimateStatus, deleteEstimate } from "@/lib/db"
 import { z } from "zod"
 
 export const runtime = "nodejs"
@@ -11,8 +11,7 @@ const StatusSchema = z.object({
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const idNum = Number(id)
-  const estimates = listEstimates()
-  const found = estimates.find((e) => e.id === idNum)
+  const found = await getEstimate(idNum)
   if (!found) return NextResponse.json({ error: "Not found" }, { status: 404 })
   return NextResponse.json(found)
 }
@@ -22,13 +21,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params
     const idNum = Number(id)
     const payload = StatusSchema.parse(await request.json())
-    const estimates = listEstimates()
-    const idx = estimates.findIndex((e) => e.id === idNum)
-    if (idx === -1) return NextResponse.json({ error: "Not found" }, { status: 404 })
-    const history = estimates[idx].history ?? []
+    const estimates = await listEstimates()
+    const current = estimates.find((e) => e.id === idNum)
+    if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    const history = current.history ?? []
     history.push({ status: payload.status, at: new Date().toISOString() })
-    const updated = { ...estimates[idx], status: payload.status, history }
-    insertEstimate({ ...updated, id: updated.id }) // persist
+    await updateEstimateStatus(idNum, payload.status, history)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error("Failed to update estimate", err)
@@ -40,7 +38,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params
     const idNum = Number(id)
-    deleteEstimate(idNum)
+    await deleteEstimate(idNum)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error("Failed to delete estimate", err)

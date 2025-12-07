@@ -8,10 +8,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const q = (searchParams.get("q") || "").toLowerCase()
 
-    const customers = listCustomers()
-    const vendors = listVendors()
-    const estimates = listEstimates()
-    const orders = listOrders()
+    const [customers, vendors, estimates, orders] = await Promise.all([
+      listCustomers(),
+      listVendors(),
+      listEstimates(),
+      listOrders(),
+    ])
 
     const matches = {
       customers: customers.filter(

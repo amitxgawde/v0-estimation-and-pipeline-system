@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   try {
     const json = await request.json()
     const parsed = CustomerSchema.parse(json)
-    const id = insertCustomer(parsed)
+    const id = await insertCustomer(parsed)
     return NextResponse.json({ id }, { status: 201 })
   } catch (error) {
     console.error("Failed to create customer", error)
@@ -32,7 +32,7 @@ const toCsvValue = (value: unknown) => {
   return str
 }
 
-const buildCustomersCsv = (customers: ReturnType<typeof listCustomers>) => {
+const buildCustomersCsv = (customers: Awaited<ReturnType<typeof listCustomers>>) => {
   const headers = ["id", "name", "email", "phone", "createdAt"]
   const rows = customers.map((c) =>
     headers
@@ -44,7 +44,7 @@ const buildCustomersCsv = (customers: ReturnType<typeof listCustomers>) => {
 
 export async function GET(request: Request) {
   try {
-    const customers = listCustomers()
+    const customers = await listCustomers()
     const url = new URL(request.url)
     const wantsCsv = url.searchParams.get("format") === "csv"
 

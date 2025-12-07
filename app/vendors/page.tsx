@@ -10,7 +10,7 @@ import { listVendors } from "@/lib/db"
 export const dynamic = "force-dynamic"
 
 export default async function VendorsPage() {
-  const vendors = listVendors()
+  const vendors = await listVendors()
 
   return (
     <div className="min-h-screen bg-background">

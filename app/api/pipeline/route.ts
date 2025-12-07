@@ -26,7 +26,7 @@ const PipelineSchema = z.array(PipelineStageSchema)
 
 export async function GET() {
   try {
-    const pipeline = listPipeline()
+    const pipeline = await listPipeline()
     return NextResponse.json({ pipeline })
   } catch (error) {
     console.error("Failed to fetch pipeline", error)
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   try {
     const json = await request.json()
     const parsed = PipelineSchema.parse(json)
-    savePipeline(parsed)
+    await savePipeline(parsed)
     return NextResponse.json({ ok: true }, { status: 201 })
   } catch (error) {
     console.error("Failed to save pipeline", error)

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   try {
     const json = await request.json()
     const parsed = VendorSchema.parse(json)
-    const id = insertVendor(parsed)
+    const id = await insertVendor(parsed)
     return NextResponse.json({ id }, { status: 201 })
   } catch (error) {
     console.error("Failed to create vendor", error)
@@ -38,7 +38,7 @@ const toCsvValue = (value: unknown) => {
   return str
 }
 
-const buildVendorsCsv = (vendors: ReturnType<typeof listVendors>) => {
+const buildVendorsCsv = (vendors: Awaited<ReturnType<typeof listVendors>>) => {
   const headers = ["id", "name", "contact", "email", "phone", "address", "category", "rating", "leadTime", "notes", "createdAt"]
   const rows = vendors.map((v) =>
     headers
@@ -50,7 +50,7 @@ const buildVendorsCsv = (vendors: ReturnType<typeof listVendors>) => {
 
 export async function GET(request: Request) {
   try {
-    const vendors = listVendors()
+    const vendors = await listVendors()
     const url = new URL(request.url)
     const wantsCsv = url.searchParams.get("format") === "csv"
 

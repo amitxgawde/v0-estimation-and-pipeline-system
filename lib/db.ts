@@ -1,5 +1,4 @@
-import fs from "fs"
-import path from "path"
+import { sql } from "@vercel/postgres"
 
 type EstimatePayload = {
   status: "submitted" | "draft" | "sent" | "viewed" | "accepted" | "negotiating" | "rejected"
@@ -84,128 +83,260 @@ type PipelineStage = {
   cards: PipelineCard[]
 }
 
-const dataDir = path.join(process.cwd(), "data")
-const jsonPath = path.join(dataDir, "app.json")
+type DbRow<T> = { id: number; data: T; created_at: string }
 
-type DbShape = {
-  estimates: Array<
-    EstimatePayload & {
-      id: number
-      items: EstimatePayload["items"]
-    }
-  >
-  vendors: Array<VendorPayload & { id: number }>
-  customers: Array<CustomerPayload & { id: number }>
-  orders: Array<OrderPayload & { id: number }>
-  pipeline: PipelineStage[]
+let tablesReady = false
+
+async function ensureTables() {
+  if (tablesReady) return
+  await sql`
+    CREATE TABLE IF NOT EXISTS estimates (
+      id SERIAL PRIMARY KEY,
+      data JSONB NOT NULL,
+      customer_name TEXT,
+      status TEXT,
+      totals_total NUMERIC,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `
+  await sql`
+    CREATE TABLE IF NOT EXISTS vendors (
+      id SERIAL PRIMARY KEY,
+      data JSONB NOT NULL,
+      name TEXT,
+      email TEXT,
+      phone TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `
+  await sql`
+    CREATE TABLE IF NOT EXISTS customers (
+      id SERIAL PRIMARY KEY,
+      data JSONB NOT NULL,
+      name TEXT,
+      email TEXT,
+      phone TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `
+  await sql`
+    CREATE TABLE IF NOT EXISTS orders (
+      id SERIAL PRIMARY KEY,
+      data JSONB NOT NULL,
+      status TEXT,
+      customer TEXT,
+      amount NUMERIC,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `
+  await sql`
+    CREATE TABLE IF NOT EXISTS pipeline (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `
+  tablesReady = true
 }
 
-function ensureStore(): DbShape {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
-  }
-  if (!fs.existsSync(jsonPath)) {
-    const empty: DbShape = { estimates: [], vendors: [], customers: [], orders: [], pipeline: [] }
-    fs.writeFileSync(jsonPath, JSON.stringify(empty, null, 2), "utf8")
-    return empty
-  }
-  const raw = fs.readFileSync(jsonPath, "utf8")
-  try {
-    const parsed = JSON.parse(raw) as Partial<DbShape>
-    return {
-      estimates: parsed.estimates ?? [],
-      vendors: parsed.vendors ?? [],
-      customers: parsed.customers ?? [],
-      orders: parsed.orders ?? [],
-      pipeline: parsed.pipeline ?? [],
-    }
-  } catch {
-    const empty: DbShape = { estimates: [], vendors: [], customers: [], orders: [], pipeline: [] }
-    fs.writeFileSync(jsonPath, JSON.stringify(empty, null, 2), "utf8")
-    return empty
-  }
+function rowToEstimate(row: DbRow<EstimatePayload>) {
+  return { ...row.data, id: row.id, createdAt: row.created_at }
 }
 
-function saveStore(db: DbShape) {
-  fs.writeFileSync(jsonPath, JSON.stringify(db, null, 2), "utf8")
+function rowToVendor(row: DbRow<VendorPayload>) {
+  return { ...row.data, id: row.id, createdAt: row.created_at }
 }
 
-export function insertEstimate(payload: EstimatePayload & { id?: number }) {
-  const db = ensureStore()
-  const nextId = payload.id ?? (db.estimates.at(-1)?.id ?? 0) + 1
+function rowToCustomer(row: DbRow<CustomerPayload>) {
+  return { ...row.data, id: row.id, createdAt: row.created_at }
+}
+
+function rowToOrder(row: DbRow<OrderPayload>) {
+  return { ...row.data, id: row.id, createdAt: row.created_at }
+}
+
+// Estimates
+export async function insertEstimate(payload: EstimatePayload & { id?: number }) {
+  await ensureTables()
   const createdAt = payload.createdAt ?? new Date().toISOString()
-  const record = { ...payload, id: nextId, createdAt, items: payload.items, history: payload.history ?? [] }
-  const existingIdx = db.estimates.findIndex((e) => e.id === nextId)
-  if (existingIdx >= 0) {
-    db.estimates[existingIdx] = record
-  } else {
-    db.estimates.push(record)
+  const status = payload.status
+  const customerName = payload.customer?.name ?? null
+  const totalsTotal = payload.totals?.total ?? null
+
+  if (payload.id) {
+    await sql`
+      UPDATE estimates
+      SET data = ${payload as any}, customer_name = ${customerName}, status = ${status}, totals_total = ${totalsTotal}, created_at = ${createdAt}
+      WHERE id = ${payload.id}
+    `
+    return payload.id
   }
-  saveStore(db)
-  return nextId
+
+  const result = await sql`
+    INSERT INTO estimates (data, customer_name, status, totals_total, created_at)
+    VALUES (${payload as any}, ${customerName}, ${status}, ${totalsTotal}, ${createdAt})
+    RETURNING id
+  `
+  return result.rows[0].id as number
 }
 
-export function listEstimates() {
-  const db = ensureStore()
-  return db.estimates.slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+export async function listEstimates() {
+  await ensureTables()
+  const result = await sql`SELECT id, data, created_at FROM estimates ORDER BY created_at DESC`
+  return result.rows.map(rowToEstimate)
 }
 
-export function deleteEstimate(id: number) {
-  const db = ensureStore()
-  db.estimates = db.estimates.filter((e) => e.id !== id)
-  saveStore(db)
+export async function getEstimate(id: number) {
+  await ensureTables()
+  const result = await sql`SELECT id, data, created_at FROM estimates WHERE id = ${id} LIMIT 1`
+  const row = result.rows[0]
+  return row ? rowToEstimate(row as any) : null
 }
 
-export function insertVendor(payload: VendorPayload) {
-  const db = ensureStore()
-  const nextId = (db.vendors.at(-1)?.id ?? 0) + 1
+export async function deleteEstimate(id: number) {
+  await ensureTables()
+  await sql`DELETE FROM estimates WHERE id = ${id}`
+}
+
+// Vendors
+export async function insertVendor(payload: VendorPayload & { id?: number }) {
+  await ensureTables()
   const createdAt = payload.createdAt ?? new Date().toISOString()
-  db.vendors.push({ ...payload, id: nextId, createdAt })
-  saveStore(db)
-  return nextId
+  const name = payload.name
+  const email = payload.email ?? null
+  const phone = payload.phone ?? null
+
+  if ((payload as any).id) {
+    const id = (payload as any).id as number
+    await sql`
+      UPDATE vendors
+      SET data = ${payload as any}, name = ${name}, email = ${email}, phone = ${phone}, created_at = ${createdAt}
+      WHERE id = ${id}
+    `
+    return id
+  }
+
+  const result = await sql`
+    INSERT INTO vendors (data, name, email, phone, created_at)
+    VALUES (${payload as any}, ${name}, ${email}, ${phone}, ${createdAt})
+    RETURNING id
+  `
+  return result.rows[0].id as number
 }
 
-export function listVendors() {
-  const db = ensureStore()
-  return db.vendors.slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+export async function listVendors() {
+  await ensureTables()
+  const result = await sql`SELECT id, data, created_at FROM vendors ORDER BY created_at DESC`
+  return result.rows.map(rowToVendor)
 }
 
-export function insertCustomer(payload: CustomerPayload) {
-  const db = ensureStore()
-  const nextId = (db.customers.at(-1)?.id ?? 0) + 1
+export async function getVendor(id: number) {
+  await ensureTables()
+  const result = await sql`SELECT id, data, created_at FROM vendors WHERE id = ${id} LIMIT 1`
+  const row = result.rows[0]
+  return row ? rowToVendor(row as any) : null
+}
+
+// Customers
+export async function insertCustomer(payload: CustomerPayload & { id?: number }) {
+  await ensureTables()
   const createdAt = payload.createdAt ?? new Date().toISOString()
-  db.customers.push({ ...payload, id: nextId, createdAt })
-  saveStore(db)
-  return nextId
+  const name = payload.name
+  const email = payload.email ?? null
+  const phone = payload.phone ?? null
+
+  if ((payload as any).id) {
+    const id = (payload as any).id as number
+    await sql`
+      UPDATE customers
+      SET data = ${payload as any}, name = ${name}, email = ${email}, phone = ${phone}, created_at = ${createdAt}
+      WHERE id = ${id}
+    `
+    return id
+  }
+
+  const result = await sql`
+    INSERT INTO customers (data, name, email, phone, created_at)
+    VALUES (${payload as any}, ${name}, ${email}, ${phone}, ${createdAt})
+    RETURNING id
+  `
+  return result.rows[0].id as number
 }
 
-export function listCustomers() {
-  const db = ensureStore()
-  return db.customers.slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+export async function listCustomers() {
+  await ensureTables()
+  const result = await sql`SELECT id, data, created_at FROM customers ORDER BY created_at DESC`
+  return result.rows.map(rowToCustomer)
 }
 
-export function insertOrder(payload: OrderPayload) {
-  const db = ensureStore()
-  const nextId = (db.orders.at(-1)?.id ?? 0) + 1
+export async function getCustomer(id: number) {
+  await ensureTables()
+  const result = await sql`SELECT id, data, created_at FROM customers WHERE id = ${id} LIMIT 1`
+  const row = result.rows[0]
+  return row ? rowToCustomer(row as any) : null
+}
+
+// Orders
+export async function insertOrder(payload: OrderPayload & { id?: number }) {
+  await ensureTables()
   const createdAt = payload.createdAt ?? new Date().toISOString()
-  db.orders.push({ ...payload, id: nextId, createdAt })
-  saveStore(db)
-  return nextId
+  const status = payload.status ?? null
+  const customer = payload.customer ?? null
+  const amount = payload.amount ?? null
+
+  if ((payload as any).id) {
+    const id = (payload as any).id as number
+    await sql`
+      UPDATE orders
+      SET data = ${payload as any}, status = ${status}, customer = ${customer}, amount = ${amount}, created_at = ${createdAt}
+      WHERE id = ${id}
+    `
+    return id
+  }
+
+  const result = await sql`
+    INSERT INTO orders (data, status, customer, amount, created_at)
+    VALUES (${payload as any}, ${status}, ${customer}, ${amount}, ${createdAt})
+    RETURNING id
+  `
+  return result.rows[0].id as number
 }
 
-export function listOrders() {
-  const db = ensureStore()
-  return db.orders.slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+export async function listOrders() {
+  await ensureTables()
+  const result = await sql`SELECT id, data, created_at FROM orders ORDER BY created_at DESC`
+  return result.rows.map(rowToOrder)
 }
 
-export function savePipeline(stages: PipelineStage[]) {
-  const db = ensureStore()
-  db.pipeline = stages
-  saveStore(db)
+export async function getOrder(id: number) {
+  await ensureTables()
+  const result = await sql`SELECT id, data, created_at FROM orders WHERE id = ${id} LIMIT 1`
+  const row = result.rows[0]
+  return row ? rowToOrder(row as any) : null
 }
 
-export function listPipeline(): PipelineStage[] {
-  const db = ensureStore()
-  return db.pipeline
+// Pipeline (single record)
+export async function savePipeline(stages: PipelineStage[]) {
+  await ensureTables()
+  await sql`
+    INSERT INTO pipeline (id, data, updated_at)
+    VALUES (1, ${stages as any}, NOW())
+    ON CONFLICT (id) DO UPDATE SET data = ${stages as any}, updated_at = NOW()
+  `
 }
 
+export async function listPipeline(): Promise<PipelineStage[]> {
+  await ensureTables()
+  const result = await sql`SELECT data FROM pipeline WHERE id = 1 LIMIT 1`
+  return result.rows[0]?.data ?? []
+}
+
+export async function updateEstimateStatus(id: number, status: string, history: Array<{ status: string; at: string }>) {
+  await ensureTables()
+  await sql`
+    UPDATE estimates
+    SET data = jsonb_set(data, '{status}', to_jsonb(${status})) || jsonb_build_object('history', to_jsonb(${history as any})),
+        status = ${status}
+    WHERE id = ${id}
+  `
+}

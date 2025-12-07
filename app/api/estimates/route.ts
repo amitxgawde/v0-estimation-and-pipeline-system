@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   try {
     const json = await request.json()
     const parsed = EstimateSchema.parse(json)
-    const id = insertEstimate(parsed)
+    const id = await insertEstimate(parsed)
     return NextResponse.json({ id }, { status: 201 })
   } catch (error) {
     console.error("Failed to create estimate", error)
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const estimates = listEstimates()
+    const estimates = await listEstimates()
     return NextResponse.json({ estimates })
   } catch (error) {
     console.error("Failed to fetch estimates", error)

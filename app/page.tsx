@@ -7,10 +7,8 @@ import { FinanceSummary } from "@/components/dashboard/finance-summary"
 import { FileText, IndianRupee, ShoppingCart, TrendingUp } from "lucide-react"
 import { listEstimates, listOrders, listPipeline } from "@/lib/db"
 
-export default function DashboardPage() {
-  const estimates = listEstimates()
-  const orders = listOrders()
-  const pipeline = listPipeline()
+export default async function DashboardPage() {
+  const [estimates, orders, pipeline] = await Promise.all([listEstimates(), listOrders(), listPipeline()])
 
   const stats = {
     estimates: estimates.length,
