@@ -7,6 +7,8 @@ import { FinanceSummary } from "@/components/dashboard/finance-summary"
 import { FileText, IndianRupee, ShoppingCart, TrendingUp } from "lucide-react"
 import { listEstimates, listOrders, listPipeline } from "@/lib/db"
 
+export const dynamic = "force-dynamic"
+
 export default async function DashboardPage() {
   const [estimates, orders, pipeline] = await Promise.all([listEstimates(), listOrders(), listPipeline()])
 
