@@ -89,10 +89,6 @@ export default function NewVendorPage() {
                   <Label htmlFor="phone">Phone</Label>
                   <Input id="phone" placeholder="+91 90000 00000" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" placeholder="+91 90000 00000" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
