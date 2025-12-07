@@ -16,8 +16,11 @@ interface PipelineColumnProps {
 
 export function PipelineColumn({ stage, onCardClick, onMoveCard, allStages }: PipelineColumnProps) {
   const totalValue = stage.cards.reduce((sum, card) => {
-    const amount = Number.parseFloat(card.amount.replace(/[$,]/g, ""))
-    return sum + amount
+    const amountNum =
+      typeof card.amount === "string"
+        ? Number.parseFloat(card.amount.replace(/[₹$,]/g, ""))
+        : Number(card.amount || 0)
+    return sum + (Number.isFinite(amountNum) ? amountNum : 0)
   }, 0)
 
   return (
@@ -86,8 +89,12 @@ export function PipelineColumn({ stage, onCardClick, onMoveCard, allStages }: Pi
               )}
 
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-foreground">{card.amount}</span>
-                <span className="text-xs text-muted-foreground">{card.date}</span>
+                <span className="text-sm font-semibold text-foreground">
+                  {Number(card.amount || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {card.date ? new Date(card.date).toLocaleDateString() : ""}
+                </span>
               </div>
             </CardContent>
           </Card>
