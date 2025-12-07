@@ -135,6 +135,10 @@ export function Header({ title, description }: HeaderProps) {
           <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary" />
         </Button>
 
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/logout">Logout</Link>
+        </Button>
+
         <Avatar className="h-8 w-8">
           <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
             <span className="sr-only">User avatar</span>

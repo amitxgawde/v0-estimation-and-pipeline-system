@@ -14,6 +14,10 @@ export function middleware(request: NextRequest) {
   // If env vars are not set, allow access to avoid lockout during setup.
   if (!expectedUser || !expectedPass) return NextResponse.next()
 
+  // Allow logout route to return its own 401 response.
+  const { pathname } = request.nextUrl
+  if (pathname.startsWith("/logout")) return NextResponse.next()
+
   const authHeader = request.headers.get("authorization")
   if (!authHeader?.startsWith("Basic ")) return unauthorized()
 
