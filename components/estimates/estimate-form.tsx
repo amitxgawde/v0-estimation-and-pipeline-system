@@ -551,13 +551,15 @@ export function EstimateForm() {
                     onChange={(e) => updateItem(item.id, "description", e.target.value)}
                   />
                 </div>
-                <div className="sm:col-span-1 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Qty</Label>
                   <Input
                     type="number"
                     min="1"
                     value={item.quantity}
                     onChange={(e) => updateItem(item.id, "quantity", Number(e.target.value))}
+                    className="text-center text-base font-semibold appearance-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    placeholder="Qty"
                   />
                 </div>
                 <div className="sm:col-span-2 space-y-2">
