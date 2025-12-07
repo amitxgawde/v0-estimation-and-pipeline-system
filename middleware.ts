@@ -4,7 +4,16 @@ function getExpectedToken() {
   const expectedUser = process.env.BASIC_AUTH_USER
   const expectedPass = process.env.BASIC_AUTH_PASS
   if (!expectedUser || !expectedPass) return null
-  return Buffer.from(`${expectedUser}:${expectedPass}`).toString("base64")
+  // Use btoa in edge; fallback to Buffer if available
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const globalBtoa = (globalThis as any).btoa as ((str: string) => string) | undefined
+    if (globalBtoa) return globalBtoa(`${expectedUser}:${expectedPass}`)
+    // eslint-disable-next-line no-undef
+    return Buffer.from(`${expectedUser}:${expectedPass}`).toString("base64")
+  } catch {
+    return null
+  }
 }
 
 export function middleware(request: NextRequest) {
