@@ -1,44 +1,40 @@
 import { NextResponse, NextRequest } from "next/server"
 
-function unauthorized() {
-  return new NextResponse("Auth required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="AGSoft"' },
-  })
+function getExpectedToken() {
+  const expectedUser = process.env.BASIC_AUTH_USER
+  const expectedPass = process.env.BASIC_AUTH_PASS
+  if (!expectedUser || !expectedPass) return null
+  // Stable token derived from env creds
+  return btoa(`${expectedUser}:${expectedPass}`)
 }
 
 export function middleware(request: NextRequest) {
-  const expectedUser = process.env.BASIC_AUTH_USER
-  const expectedPass = process.env.BASIC_AUTH_PASS
-
-  // If env vars are not set, allow access to avoid lockout during setup.
-  if (!expectedUser || !expectedPass) return NextResponse.next()
-
-  // Allow logout route to return its own 401 response.
   const { pathname } = request.nextUrl
-  if (pathname.startsWith("/logout")) return NextResponse.next()
 
-  const authHeader = request.headers.get("authorization")
-  if (!authHeader?.startsWith("Basic ")) return unauthorized()
-
-  const base64 = authHeader.split(" ")[1] || ""
-  let decoded = ""
-  try {
-    decoded = atob(base64)
-  } catch (err) {
-    return unauthorized()
+  // Skip auth for login/logout and static assets
+  const publicPaths = ["/auth", "/api/auth/login", "/logout", "/favicon.ico", "/robots.txt", "/sitemap.xml"]
+  if (
+    pathname.startsWith("/_next/static") ||
+    pathname.startsWith("/_next/image") ||
+    publicPaths.some((p) => pathname.startsWith(p))
+  ) {
+    return NextResponse.next()
   }
 
-  const [user, ...rest] = decoded.split(":")
-  const pass = rest.join(":")
+  const expectedToken = getExpectedToken()
+  // If env vars are not set, allow access to avoid lockout during setup.
+  if (!expectedToken) return NextResponse.next()
 
-  if (user !== expectedUser || pass !== expectedPass) return unauthorized()
+  const cookie = request.cookies.get("agsoft_auth")?.value
+  if (cookie === expectedToken) return NextResponse.next()
 
-  return NextResponse.next()
+  const loginUrl = new URL("/auth", request.url)
+  loginUrl.searchParams.set("from", pathname || "/")
+  return NextResponse.redirect(loginUrl)
 }
 
-// Skip static assets and public files
+// Apply to all routes except static assets handled above
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)"],
+  matcher: ["/((?!_next/static|_next/image).*)"],
 }
 
